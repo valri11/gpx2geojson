@@ -3,12 +3,11 @@ package main
 import (
 	"encoding/xml"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"time"
 
-	"github.com/paulmach/orb"
-	"github.com/paulmach/orb/geojson"
+	"github.com/peterstace/simplefeatures/geom"
 )
 
 type GpxTrackPoint struct {
@@ -45,32 +44,51 @@ func main() {
 	inFile := os.Args[1]
 
 	xmlFile, err := os.Open(inFile)
+	if err != nil {
+		fmt.Printf("ERR: %v\n", err)
+		return
+	}
 	defer xmlFile.Close()
 
-	data, err := ioutil.ReadAll(xmlFile)
+	data, err := io.ReadAll(xmlFile)
 	if err != nil {
-		panic(err)
+		fmt.Printf("ERR: %v\n", err)
+		return
 	}
 
 	var doc GpxDoc
 	err = xml.Unmarshal(data, &doc)
 	if err != nil {
-		panic(err)
+		fmt.Printf("ERR: %v\n", err)
+		return
 	}
 
-	fc := geojson.NewFeatureCollection()
+	fc := geom.GeoJSONFeatureCollection{}
 
 	for _, track := range doc.Tracks {
-		ls := make(orb.LineString, 0)
+
+		coords := make([]float64, 0)
 		for _, ptSeg := range track.TrackSeg[0].TrackPoints {
 
-			pt := orb.Point{ptSeg.Lon, ptSeg.Lat}
-			ls = append(ls, pt)
+			cd := []float64{
+				ptSeg.Lon,
+				ptSeg.Lat,
+				ptSeg.Ele,
+				float64(ptSeg.Time.Unix()),
+			}
+			coords = append(coords, cd...)
 		}
-		feat := geojson.NewFeature(ls)
+
+		seq := geom.NewSequence(coords, geom.DimXYZM)
+
+		ls := geom.NewLineString(seq)
+
+		feat := geom.GeoJSONFeature{}
+		feat.Geometry = ls.AsGeometry()
+		feat.Properties = make(map[string]any)
 		feat.Properties["name"] = track.Name
 
-		fc.Append(feat)
+		fc = append(fc, feat)
 	}
 
 	rawJSON, _ := fc.MarshalJSON()

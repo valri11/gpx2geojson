@@ -1,5 +1,5 @@
 module github.com/valri11/gpx2geojson
 
-go 1.18
+go 1.21
 
-require github.com/paulmach/orb v0.7.1
+require github.com/peterstace/simplefeatures v0.49.0
